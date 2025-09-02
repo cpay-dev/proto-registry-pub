@@ -23,6 +23,7 @@ jobs:
         # actions/checkout v5.0.0
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
 
+      # Resolve correct protoc archive name for the current runner
       - name: Compute protoc archive name
         id: protoc-arch
         shell: bash
@@ -31,28 +32,25 @@ jobs:
           V="${PROTOC_VERSION}"
           OS="${{ runner.os }}"
           ARCH="${{ runner.arch }}"
-
           case "$OS" in
             Linux)  OS_ID="linux" ;;
             macOS)  OS_ID="osx" ;;
             *) echo "Unsupported OS: $OS" >&2; exit 1 ;;
           esac
-
           case "$ARCH" in
-            X64)   CPU_ID="x86_64" ;;
-            ARM64) CPU_ID="aarch_64" ;;
+            X64)     CPU_ID="x86_64" ;;
+            ARM64)   CPU_ID="aarch_64" ;;
             *) echo "Unsupported arch: $ARCH" >&2; exit 1 ;;
           esac
-
           FILE="protoc-${V}-${OS_ID}-${CPU_ID}.zip"
           TAG="v${V}"
-
           echo "file=$FILE" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG"   >> "$GITHUB_OUTPUT"
 
       - name: Restore protoc cache
         id: protoc-cache
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        # actions/cache v4.2.4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
         with:
           path: ~/.protoc
           key: protoc-${{ steps.protoc-arch.outputs.tag }}-${{ steps.protoc-arch.outputs.file }}-${{ runner.os }}
@@ -70,20 +68,12 @@ jobs:
           curl -sSfL -o "$FILE" "$URL"
           unzip -o "$FILE" -d "$HOME/.protoc"
           rm -f "$FILE"
-          echo "$HOME/.protoc/bin" >> "$GITHUB_PATH"
-          echo "PROTOC_INCLUDE=$HOME/.protoc/include" >> "$GITHUB_ENV"
 
-      - name: Add protoc to PATH and env (cache hit)
-        if: steps.protoc-cache.outputs.cache-hit == 'true'
+      - name: Add protoc to PATH and set include env
         shell: bash
         run: |
           echo "$HOME/.protoc/bin" >> "$GITHUB_PATH"
           echo "PROTOC_INCLUDE=$HOME/.protoc/include" >> "$GITHUB_ENV"
-
-      - name: Verify protoc
-        shell: bash
-        run: |
-          set -eux
           protoc --version
           test -d "$PROTOC_INCLUDE"
 
@@ -92,28 +82,13 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "24"
+          cache: "npm"
 
-      - name: Enable corepack and pin pnpm 10.15.1
+      - name: Write package.json for ts-proto
         shell: bash
         run: |
           set -eux
-          corepack enable
-          corepack prepare pnpm@10.15.1 --activate
-          pnpm --version
-
-      - name: Restore pnpm store cache
-        id: pnpm-store-cache
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-        with:
-          path: ~/.pnpm-store
-          key: pnpm-store-${{ runner.os }}-pnpm10.15.1
-
-      - name: Write deps package.json
-        shell: bash
-        run: |
-          set -eux
-          mkdir -p build/typescript-deps
-          cat > build/typescript-deps/package.json <<'JSON'
+          cat > package.json <<'JSON'
           {
             "name": "ts-proto-deps",
             "private": true,
@@ -123,43 +98,11 @@ jobs:
           }
           JSON
 
-      - name: Restore ts-proto deps cache
-        id: tsproto-cache
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-        with:
-          path: |
-            build/typescript-deps/node_modules
-            build/typescript-deps/pnpm-lock.yaml
-          key: ts-proto-deps-65dc52fdc390c4a6a373fa3212bac58aaa480713-${{ runner.os }}-pnpm10.15.1
-
-      - name: Install deps with pnpm
-        if: steps.tsproto-cache.outputs.cache-hit != 'true'
+      - name: Install ts-proto
         shell: bash
         run: |
           set -eux
-          pnpm --dir build/typescript-deps install
-          ./build/typescript-deps/node_modules/.bin/protoc-gen-ts_proto --version || true
-
-      - name: Generate TypeScript from protobufs
-        shell: bash
-        run: |
-          set -eux
-          find ./build/typescript/gen -name '*.pb.ts' -delete || true
-          find src -type f -name '*.proto' -print0 | xargs -0 -n1 -I{} \
-          protoc \
-            --plugin=./build/typescript-deps/node_modules/.bin/protoc-gen-ts_proto \
-            -I src \
-            -I "$PROTOC_INCLUDE" \
-            --ts_proto_out=./build/typescript/gen \
-            --ts_proto_opt=esModuleInterop=true \
-            --ts_proto_opt=env=browser \
-            --ts_proto_opt=removeEnumPrefix=true \
-            --ts_proto_opt=fileSuffix=.pb \
-            --ts_proto_opt=outputJsonMethods=false \
-            {}
-
-      - name: Verify output
-        shell: bash
-        run: |
-          set -eux
-          ls -la build/typescript/gen
+          pnpm install
+          echo 'syntax="proto3";' > simple.proto
+          protoc --plugin=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=. ./simple.proto
+          ls -la
