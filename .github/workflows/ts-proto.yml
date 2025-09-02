@@ -27,8 +27,6 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: "24"
-          cache: pnpm
-          cache-dependency-path: build/typescript-deps/pnpm-lock.yaml
 
       - name: Enable corepack and pin pnpm 10.15.1
         run: |
