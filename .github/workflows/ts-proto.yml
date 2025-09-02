@@ -39,8 +39,8 @@ jobs:
           esac
 
           case "$ARCH" in
-            X64)     CPU_ID="x86_64" ;;
-            ARM64)   CPU_ID="aarch_64" ;;
+            X64)   CPU_ID="x86_64" ;;
+            ARM64) CPU_ID="aarch_64" ;;
             *) echo "Unsupported arch: $ARCH" >&2; exit 1 ;;
           esac
 
@@ -52,8 +52,7 @@ jobs:
 
       - name: Restore protoc cache
         id: protoc-cache
-        # actions/cache v4.2.4
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: ~/.protoc
           key: protoc-${{ steps.protoc-arch.outputs.tag }}-${{ steps.protoc-arch.outputs.file }}-${{ runner.os }}
@@ -71,7 +70,6 @@ jobs:
           curl -sSfL -o "$FILE" "$URL"
           unzip -o "$FILE" -d "$HOME/.protoc"
           rm -f "$FILE"
-          # Persist for later steps
           echo "$HOME/.protoc/bin" >> "$GITHUB_PATH"
           echo "PROTOC_INCLUDE=$HOME/.protoc/include" >> "$GITHUB_ENV"
 
@@ -104,40 +102,49 @@ jobs:
           pnpm --version
 
       - name: Restore pnpm store cache
-        id: pnpm-cache
-        # actions/cache v4.2.4
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        id: pnpm-store-cache
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: ~/.pnpm-store
-          key: pnpm-store-${{ runner.os }}-${{ hashFiles('build/typescript-deps/pnpm-lock.yaml') }}
-          restore-keys: |
-            pnpm-store-${{ runner.os }}-
+          key: pnpm-store-${{ runner.os }}-pnpm10.15.1
 
-      - name: Prepare deps workspace
+      - name: Write deps package.json
         shell: bash
         run: |
           set -eux
           mkdir -p build/typescript-deps
-          if [ ! -f build/typescript-deps/package.json ]; then
-            pnpm --dir build/typescript-deps init --yes
-            pnpm --dir build/typescript-deps pkg set name=ts-proto-deps
-            pnpm --dir build/typescript-deps pkg set private=true
-          fi
+          cat > build/typescript-deps/package.json <<'JSON'
+          {
+            "name": "ts-proto-deps",
+            "private": true,
+            "dependencies": {
+              "ts-proto": "stephenh/ts-proto#65dc52fdc390c4a6a373fa3212bac58aaa480713"
+            }
+          }
+          JSON
 
-      - name: Install ts-proto 2.7.7 with pnpm
+      - name: Restore ts-proto deps cache
+        id: tsproto-cache
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: |
+            build/typescript-deps/node_modules
+            build/typescript-deps/pnpm-lock.yaml
+          key: ts-proto-deps-65dc52fdc390c4a6a373fa3212bac58aaa480713-${{ runner.os }}-pnpm10.15.1
+
+      - name: Install deps with pnpm
+        if: steps.tsproto-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -eux
-          pnpm --dir build/typescript-deps add ts-proto@2.7.7
+          pnpm --dir build/typescript-deps install
           ./build/typescript-deps/node_modules/.bin/protoc-gen-ts_proto --version || true
 
       - name: Generate TypeScript from protobufs
         shell: bash
         run: |
           set -eux
-          # Clean old outputs
           find ./build/typescript/gen -name '*.pb.ts' -delete || true
-          # Generate for each .proto under src
           find src -type f -name '*.proto' -print0 | xargs -0 -n1 -I{} \
           protoc \
             --plugin=./build/typescript-deps/node_modules/.bin/protoc-gen-ts_proto \
