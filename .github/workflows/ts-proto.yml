@@ -8,7 +8,6 @@ permissions:
   contents: read
 
 env:
-  # Set the exact protoc version you want
   PROTOC_VERSION: "32.0"
 
 jobs:
@@ -120,7 +119,7 @@ jobs:
           set -eux
           mkdir -p build/typescript-deps
           if [ ! -f build/typescript-deps/package.json ]; then
-            pnpm --dir build/typescript-deps init -y
+            pnpm --dir build/typescript-deps init --yes
             pnpm --dir build/typescript-deps pkg set name=ts-proto-deps
             pnpm --dir build/typescript-deps pkg set private=true
           fi
