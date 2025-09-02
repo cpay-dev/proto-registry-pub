@@ -89,7 +89,9 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "22"
+          node-version: "24"
+          cache: 'pnpm'
+          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Enable corepack and pin pnpm 10.15.1
         shell: bash
@@ -133,8 +135,4 @@ jobs:
         shell: bash
         run: |
           set -eux
-          cd deps/ts-proto
-          pnpm install --frozen-lockfile
-          echo 'syntax="proto3";' > simple.proto
-          protoc --plugin=./node_modules/.bin/protoc-gen-ts_proto --ts_proto_out=. ./simple.proto
-          ls -la
+          pnpm install --dir deps/ts-proto --frozen-lockfile
