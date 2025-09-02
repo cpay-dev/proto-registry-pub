@@ -89,8 +89,6 @@ jobs:
           protoc --version
           test -d "$PROTOC_INCLUDE"
 
-      # ---------- pnpm install from GitHub releases and cache ----------
-
       - name: Compute pnpm filename
         id: pnpm-arch
         shell: bash
@@ -150,13 +148,6 @@ jobs:
         run: |
           set -eux
           pnpm --version
-
-      # ---------- Node and deps ----------
-
-      - name: Set up Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: "24"
 
       - name: Enable pnpm store cache
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
