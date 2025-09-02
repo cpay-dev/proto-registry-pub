@@ -119,6 +119,7 @@ jobs:
             }
           }
           JSON
+          cat package.json
 
       # - name: Restore ts-proto deps cache
       #   id: tsproto-cache
