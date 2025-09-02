@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package cpay.blockchain.v1;
+
+option go_package = "github.com/cpay-dev/proto-go/blockchain/v1";
+
+enum Chain {
+  CHAIN_UNSPECIFIED = 0;
+  CHAIN_ANY_EVM = 1;
+  CHAIN_ANY_SVM = 2;
+}
