@@ -7,20 +7,78 @@ on:
 permissions:
   contents: read
 
+env:
+  PROTOC_VERSION: "32.0"
+
 jobs:
   codegen:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
 
     steps:
       - name: Checkout
         # actions/checkout v5.0.0
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
 
-      - name: Install protoc
+      # Resolve correct protoc archive name for the current runner
+      - name: Compute protoc archive name
+        id: protoc-arch
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y protobuf-compiler
+          set -eu
+          V="${PROTOC_VERSION}"
+          OS="${{ runner.os }}"
+          ARCH="${{ runner.arch }}"
+          # Map to protoc archive suffixes
+          case "$OS" in
+            Linux)  OS_ID="linux" ;;
+            macOS)  OS_ID="osx" ;;
+            *) echo "Unsupported OS: $OS" >&2; exit 1 ;;
+          esac
+          case "$ARCH" in
+            X64)     CPU_ID="x86_64" ;;
+            ARM64)   CPU_ID="aarch_64" ;; # Apple Silicon on macOS
+            *) echo "Unsupported arch: $ARCH" >&2; exit 1 ;;
+          esac
+          # protoc filenames do not include the leading "v", but the release tag does.
+          # Example: tag v3.21.12, file protoc-3.21.12-linux-x86_64.zip
+          FILE="protoc-${V}-${OS_ID}-${CPU_ID}.zip"
+          TAG="v${V}"
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"   >> "$GITHUB_OUTPUT"
+
+      - name: Restore protoc cache
+        id: protoc-cache
+        # actions/cache v4.2.4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: ~/.protoc
+          key: protoc-${{ steps.protoc-arch.outputs.tag }}-${{ steps.protoc-arch.outputs.file }}-${{ runner.os }}
+
+      - name: Install protoc ${{ env.PROTOC_VERSION }}
+        if: steps.protoc-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -eux
+          mkdir -p "$HOME/.protoc"
+          FILE="${{ steps.protoc-arch.outputs.file }}"
+          TAG="${{ steps.protoc-arch.outputs.tag }}"
+          URL="https://github.com/protocolbuffers/protobuf/releases/download/${TAG}/${FILE}"
+          echo "Downloading $URL"
+          curl -sSfL -o "$FILE" "$URL"
+          unzip -o "$FILE" -d "$HOME/.protoc"
+          rm -f "$FILE"
+
+      - name: Add protoc to PATH and set include env
+        shell: bash
+        run: |
+          echo "$HOME/.protoc/bin" >> "$GITHUB_PATH"
+          echo "PROTOC_INCLUDE=$HOME/.protoc/include" >> "$GITHUB_ENV"
           protoc --version
+          test -d "$PROTOC_INCLUDE"
 
       - name: Set up Node
         # actions/setup-node v4.4.0
@@ -29,6 +87,7 @@ jobs:
           node-version: "24"
 
       - name: Enable corepack and pin pnpm 10.15.1
+        shell: bash
         run: |
           set -eux
           corepack enable
@@ -46,6 +105,7 @@ jobs:
             pnpm-store-${{ runner.os }}-
 
       - name: Prepare deps workspace
+        shell: bash
         run: |
           set -eux
           mkdir -p build/typescript-deps
@@ -56,12 +116,14 @@ jobs:
           fi
 
       - name: Install ts-proto 2.7.7 with pnpm
+        shell: bash
         run: |
           set -eux
           pnpm --dir build/typescript-deps add ts-proto@2.7.7
           ./build/typescript-deps/node_modules/.bin/protoc-gen-ts_proto --version || true
 
       - name: Generate TypeScript from protobufs
+        shell: bash
         run: |
           set -eux
           # Clean old outputs
@@ -71,6 +133,7 @@ jobs:
           protoc \
             --plugin=./build/typescript-deps/node_modules/.bin/protoc-gen-ts_proto \
             -I src \
+            -I "$PROTOC_INCLUDE" \
             --ts_proto_out=./build/typescript/gen \
             --ts_proto_opt=esModuleInterop=true \
             --ts_proto_opt=env=browser \
@@ -80,6 +143,7 @@ jobs:
             {}
 
       - name: Verify output
+        shell: bash
         run: |
           set -eux
           ls -la build/typescript/gen
