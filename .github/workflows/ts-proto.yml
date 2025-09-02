@@ -1,0 +1,87 @@
+name: ts-proto codegen
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  codegen:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        # actions/checkout v5.0.0
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+
+      - name: Install protoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+          protoc --version
+
+      - name: Set up Node
+        # actions/setup-node v4.4.0
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: build/typescript-deps/pnpm-lock.yaml
+
+      - name: Enable corepack and pin pnpm 10.15.1
+        run: |
+          set -eux
+          corepack enable
+          corepack prepare pnpm@10.15.1 --activate
+          pnpm --version
+
+      - name: Restore pnpm store cache
+        id: pnpm-cache
+        # actions/cache v4.2.4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: ~/.pnpm-store
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('build/typescript-deps/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      - name: Prepare deps workspace
+        run: |
+          set -eux
+          mkdir -p build/typescript-deps
+          if [ ! -f build/typescript-deps/package.json ]; then
+            pnpm --dir build/typescript-deps init -y
+            pnpm --dir build/typescript-deps pkg set name=ts-proto-deps
+            pnpm --dir build/typescript-deps pkg set private=true
+          fi
+
+      - name: Install ts-proto 2.7.7 with pnpm
+        run: |
+          set -eux
+          pnpm --dir build/typescript-deps add ts-proto@2.7.7
+          ./build/typescript-deps/node_modules/.bin/protoc-gen-ts_proto --version || true
+
+      - name: Generate TypeScript from protobufs
+        run: |
+          set -eux
+          # Clean old outputs
+          find ./build/typescript/gen -name '*.pb.ts' -delete || true
+          # Generate for each .proto under src
+          find src -type f -name '*.proto' -print0 | xargs -0 -n1 -I{} \
+          protoc \
+            --plugin=./build/typescript-deps/node_modules/.bin/protoc-gen-ts_proto \
+            -I src \
+            --ts_proto_out=./build/typescript/gen \
+            --ts_proto_opt=esModuleInterop=true \
+            --ts_proto_opt=env=browser \
+            --ts_proto_opt=removeEnumPrefix=true \
+            --ts_proto_opt=fileSuffix=.pb \
+            --ts_proto_opt=outputJsonMethods=false \
+            {}
+
+      - name: Verify output
+        run: |
+          set -eux
+          ls -la build/typescript/gen
