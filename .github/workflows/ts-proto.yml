@@ -8,6 +8,7 @@ permissions:
   contents: read
 
 env:
+  # Set the exact protoc version you want
   PROTOC_VERSION: "32.0"
 
 jobs:
@@ -23,7 +24,6 @@ jobs:
         # actions/checkout v5.0.0
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
 
-      # Resolve correct protoc archive name for the current runner
       - name: Compute protoc archive name
         id: protoc-arch
         shell: bash
@@ -32,21 +32,22 @@ jobs:
           V="${PROTOC_VERSION}"
           OS="${{ runner.os }}"
           ARCH="${{ runner.arch }}"
-          # Map to protoc archive suffixes
+
           case "$OS" in
             Linux)  OS_ID="linux" ;;
             macOS)  OS_ID="osx" ;;
             *) echo "Unsupported OS: $OS" >&2; exit 1 ;;
           esac
+
           case "$ARCH" in
             X64)     CPU_ID="x86_64" ;;
-            ARM64)   CPU_ID="aarch_64" ;; # Apple Silicon on macOS
+            ARM64)   CPU_ID="aarch_64" ;;
             *) echo "Unsupported arch: $ARCH" >&2; exit 1 ;;
           esac
-          # protoc filenames do not include the leading "v", but the release tag does.
-          # Example: tag v3.21.12, file protoc-3.21.12-linux-x86_64.zip
+
           FILE="protoc-${V}-${OS_ID}-${CPU_ID}.zip"
           TAG="v${V}"
+
           echo "file=$FILE" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG"   >> "$GITHUB_OUTPUT"
 
@@ -71,12 +72,21 @@ jobs:
           curl -sSfL -o "$FILE" "$URL"
           unzip -o "$FILE" -d "$HOME/.protoc"
           rm -f "$FILE"
+          # Persist for later steps
+          echo "$HOME/.protoc/bin" >> "$GITHUB_PATH"
+          echo "PROTOC_INCLUDE=$HOME/.protoc/include" >> "$GITHUB_ENV"
 
-      - name: Add protoc to PATH and set include env
+      - name: Add protoc to PATH and env (cache hit)
+        if: steps.protoc-cache.outputs.cache-hit == 'true'
         shell: bash
         run: |
           echo "$HOME/.protoc/bin" >> "$GITHUB_PATH"
           echo "PROTOC_INCLUDE=$HOME/.protoc/include" >> "$GITHUB_ENV"
+
+      - name: Verify protoc
+        shell: bash
+        run: |
+          set -eux
           protoc --version
           test -d "$PROTOC_INCLUDE"
 
