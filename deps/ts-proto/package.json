@@ -1,0 +1,7 @@
+{
+  "name": "ts-proto-deps",
+  "private": true,
+  "dependencies": {
+    "ts-proto": "2.7.7"
+  }
+}
