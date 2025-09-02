@@ -9,6 +9,7 @@ permissions:
 
 env:
   PROTOC_VERSION: "32.0"
+  PNPM_VERSION: "10.15.1"
 
 jobs:
   codegen:
@@ -21,6 +22,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      # ---------- protoc install and cache ----------
 
       - name: Compute protoc archive name
         id: protoc-arch
@@ -86,20 +89,76 @@ jobs:
           protoc --version
           test -d "$PROTOC_INCLUDE"
 
+      # ---------- pnpm install from GitHub releases and cache ----------
+
+      - name: Compute pnpm filename
+        id: pnpm-arch
+        shell: bash
+        run: |
+          set -eu
+          V="${PNPM_VERSION}"
+          OS="${{ runner.os }}"
+          ARCH="${{ runner.arch }}"
+
+          case "$OS" in
+            Linux)  OS_ID="linux" ;;
+            macOS)  OS_ID="macos" ;;
+            *) echo "Unsupported OS: $OS" >&2; exit 1 ;;
+          esac
+
+          case "$ARCH" in
+            X64)   CPU_ID="x64" ;;
+            ARM64) CPU_ID="arm64" ;;
+            *) echo "Unsupported arch: $ARCH" >&2; exit 1 ;;
+          esac
+
+          FILE="pnpm-${OS_ID}-${CPU_ID}"
+          TAG="v${V}"
+
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"   >> "$GITHUB_OUTPUT"
+
+      - name: Restore pnpm binary cache
+        id: pnpm-cache
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: ~/.pnpm-bin
+          key: pnpm-${{ steps.pnpm-arch.outputs.tag }}-${{ steps.pnpm-arch.outputs.file }}-${{ runner.os }}
+
+      - name: Install pnpm ${{ env.PNPM_VERSION }} from GitHub
+        if: steps.pnpm-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -eux
+          mkdir -p "$HOME/.pnpm-bin"
+          FILE="${{ steps.pnpm-arch.outputs.file }}"
+          TAG="${{ steps.pnpm-arch.outputs.tag }}"
+          URL="https://github.com/pnpm/pnpm/releases/download/${TAG}/${FILE}"
+          echo "Downloading $URL"
+          curl -sSfL -o "$HOME/.pnpm-bin/pnpm" "$URL"
+          chmod +x "$HOME/.pnpm-bin/pnpm"
+          echo "$HOME/.pnpm-bin" >> "$GITHUB_PATH"
+
+      - name: Add pnpm to PATH (cache hit)
+        if: steps.pnpm-cache.outputs.cache-hit == 'true'
+        shell: bash
+        run: |
+          echo "$HOME/.pnpm-bin" >> "$GITHUB_PATH"
+
+      - name: Verify pnpm
+        shell: bash
+        run: |
+          set -eux
+          pnpm --version
+
+      # ---------- Node and deps ----------
+
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
 
-      - name: Enable corepack and pin pnpm 10.15.1
-        shell: bash
-        run: |
-          set -eux
-          corepack enable
-          corepack prepare pnpm@10.15.1 --activate
-          pnpm --version
-
-      - name: Enable pnpm cache
+      - name: Enable pnpm store cache
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: "24"
@@ -127,4 +186,3 @@ jobs:
           --ts_proto_opt=removeEnumPrefix=true \
           --ts_proto_opt=fileSuffix=.pb \
           --ts_proto_opt=outputJsonMethods=false {} \;
-          ls -la build
