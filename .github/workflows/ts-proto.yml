@@ -161,7 +161,7 @@ jobs:
           set -eux
           pnpm install --dir deps/ts-proto --frozen-lockfile
 
-      - name: Build ts proto
+      - name: Build sources
         shell: bash
         run: |
           set -eux
@@ -176,3 +176,25 @@ jobs:
           --ts_proto_opt=removeEnumPrefix=true \
           --ts_proto_opt=fileSuffix=.pb \
           --ts_proto_opt=outputJsonMethods=false {} \;
+
+      - name: Checkout proto-ts
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          repository: 'github.com/cpay-dev/proto-ts-pub'
+          path: 'proto-ts-pub'
+
+      - name: Sync sources
+        run: |
+          set -eux
+          test -d build || { echo "build dir not found"; exit 1; }
+          rm -rf 'proto-ts-pub/src'
+          mkdir 'proto-ts-pub/src'
+          cp -r ./build proto-ts-pub/src
+
+      - name: Validate ts library builds
+        working-directory: 'proto-ts-pub'
+        run: |
+          set -eux
+          pnpm install --frozen-lockfile
+          pnpm run build
+          pnpm run typecheck
