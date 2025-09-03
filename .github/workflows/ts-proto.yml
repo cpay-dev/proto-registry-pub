@@ -18,7 +18,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-14 ]
+        # os: [ ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-14 ]
+        os: [ ubuntu-24.04-arm ]
 
     steps:
       - name: Checkout
@@ -202,15 +203,33 @@ jobs:
         working-directory: 'proto-ts-pub'
         env:
           REV: ${{ github.sha }}
+          BRANCH: "sync/${{ github.sha }}"
+          GH_TOKEN: ${{ secrets.PROTO_TS_PUB_WRITE_TOKEN }}
         run: |
           set -eux
           git config user.name "cpay.dev GIT BOT"
           git config user.email "203521523+cpay-dev-git@users.noreply.github.com"
-          git checkout -B "$REV"
+          git checkout -B "$BRANCH"
           git add -A
           if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
           fi
           git commit -m "sync: github.com/cpay-dev/proto-registry-pub/commit/$REV"
-          git push -u origin "$REV"
+          git push -u origin "$BRANCH"
+
+      - name: Open PR
+        working-directory: 'proto-ts-pub'
+        env:
+          REV: ${{ github.sha }}
+          BRANCH: "sync/${{ github.sha }}"
+          GH_TOKEN: ${{ secrets.PROTO_TS_PUB_WRITE_TOKEN }}
+        run: |
+          set -eux
+          gh pr list --state open --head "$BRANCH" --json number --jq '.[0].number' | grep -qE '^[0-9]+$' && exit 0
+          gh pr create \
+            --base "autobuild" \
+            --head "$BRANCH" \
+            --title "Sync: $(git rev-parse --short HEAD)" \
+            --body "Commit: $REV\nSource: github.com/cpay-dev/proto-registry-pub/commit/$REV"
+
