@@ -199,6 +199,16 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm run build
 
+      - name: Install SSH signing key
+        if: ${{ matrix.os == 'macos-15' }}
+        env:
+          SIGNING_KEY: ${{ secrets.SSH_SIGNING_KEY }}
+        run: |
+          set -eux
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "${SIGNING_KEY}" > "$HOME/.ssh/github-signing"
+          chmod 600 "$HOME/.ssh/github-signing"
+
       - name: Commit and push to ts-proto
         if: ${{ matrix.os == 'macos-15' }}
         working-directory: 'proto-ts-pub'
@@ -208,8 +218,11 @@ jobs:
           GH_TOKEN: ${{ secrets.PROTO_TS_PUB_WRITE_TOKEN }}
         run: |
           set -eux
-          git config user.name "cpay.dev GIT BOT"
-          git config user.email "github@cpay.dev"
+          git config user.name "cpay.dev[bot]"
+          git config user.email "203521523+cpay-dev-git@users.noreply.github.com"
+          git config gpg.format ssh
+          git config user.signingkey "$HOME/.ssh/github-signing"
+          git config commit.gpgsign true
           git checkout -B "$BRANCH"
           git add -A
           if git diff --cached --quiet; then
