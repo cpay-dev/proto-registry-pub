@@ -12,7 +12,7 @@ env:
   GOBIN: "${{ github.workspace }}/.cache/go-tools/bin"
   PROTOC_VERSION: "32.0"
   PROTOC_BIN_VERSION: "v1.36.8"
-  GRPC_BIN_VERSION: "v1.75.0"
+  GRPC_BIN_VERSION: "v1.5.1"
 
 jobs:
   codegen:
@@ -91,6 +91,7 @@ jobs:
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
           go-version: ${{ matrix.go-version }}
+          cache: true
 
       - name: Ensure go cache dirs and PATH
         run: |
