@@ -16,9 +16,9 @@ jobs:
   codegen:
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      # max-parallel: 1
       matrix:
-        os: [ ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-14 ]
+        os: [ ubuntu-24.04, ubuntu-24.04-arm, macos-15 ]
 
     steps:
       - name: Checkout
@@ -200,6 +200,7 @@ jobs:
           pnpm run build
 
       - name: Commit and push to ts-proto
+        if: ${{ matrix.os == 'ubuntu-24.04' }}
         working-directory: 'proto-ts-pub'
         env:
           REV: ${{ github.sha }}
@@ -219,6 +220,7 @@ jobs:
           git push -u origin "$BRANCH"
 
       - name: Open PR
+        if: ${{ matrix.os == 'ubuntu-24.04' }}
         working-directory: 'proto-ts-pub'
         env:
           REV: ${{ github.sha }}
@@ -227,10 +229,8 @@ jobs:
         run: |
           set -eux
           gh pr list --state open --head "$BRANCH" --json number --jq '.[0].number' | grep -qE '^[0-9]+$' && exit 0
-          echo "Commit: $REV" >> body.txt
-          echo "Source: github.com/cpay-dev/proto-registry-pub/commit/$REV" >> body.txt
           gh pr create \
             --base "autobuild" \
             --head "$BRANCH" \
             --title "Sync: $(git rev-parse --short HEAD)" \
-            --body-file body.txt
+            --body "[Source commit](https://github.com/cpay-dev/proto-registry-pub/commit/$REV)"
