@@ -216,7 +216,7 @@ jobs:
             echo "No changes to commit"
             exit 0
           fi
-          git commit -S -m "sync: github.com/cpay-dev/proto-registry-pub/commit/$REV"
+          git commit -m "sync: github.com/cpay-dev/proto-registry-pub/commit/$REV"
           git push -u origin "$BRANCH"
 
       - name: Open PR
