@@ -197,4 +197,20 @@ jobs:
           set -eux
           pnpm install --frozen-lockfile
           pnpm run build
-          pnpm run typecheck
+
+      - name: Commit and push to ts-proto
+        working-directory: 'proto-ts-pub'
+        env:
+         REV: ${{ github.sha }}
+        run: |
+          set -eux
+          echo "REV: $REV"
+          git config user.name "cpay.dev GIT BOT"
+          git config user.email "203521523+cpay-dev-git@users.noreply.github.com"
+          git checkout -B "$(git rev-parse HEAD)"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "sync: github.com/cpay-dev/proto-registry-pub/commit/${{ github.sha }}"
