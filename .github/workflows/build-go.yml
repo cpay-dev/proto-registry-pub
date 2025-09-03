@@ -153,5 +153,6 @@ jobs:
             ! -name 'go.sum' \
             ! -name '.*' \
             -exec rm -rf {} +
+          ls -la ./build
           cp -r ./build/* proto-go-pub/
           ls -la proto-go-pub/
