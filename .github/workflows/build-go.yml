@@ -1,0 +1,119 @@
+name: sync Go
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  GOBIN: "${{ github.workspace }}/.cache/go-tools/bin"
+  PROTOC_VERSION: "32.0"
+  PROTOC_BIN_VERSION: "1.36.8"
+  GRPC_BIN_VERSION: "1.75.0"
+
+jobs:
+  codegen:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      max-parallel: 1
+      matrix:
+        os: [ macos-15, ubuntu-24.04, ubuntu-24.04-arm ]
+        go-version: [ '1.25.1' ]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Compute protoc archive name
+        id: protoc-arch
+        run: |
+          set -eu
+          V="${PROTOC_VERSION}"
+          OS="${{ runner.os }}"
+          ARCH="${{ runner.arch }}"
+
+          case "$OS" in
+            Linux)  OS_ID="linux" ;;
+            macOS)  OS_ID="osx" ;;
+            *) echo "Unsupported OS: $OS" >&2; exit 1 ;;
+          esac
+
+          case "$ARCH" in
+            X64)   CPU_ID="x86_64" ;;
+            ARM64) CPU_ID="aarch_64" ;;
+            *) echo "Unsupported arch: $ARCH" >&2; exit 1 ;;
+          esac
+
+          FILE="protoc-${V}-${OS_ID}-${CPU_ID}.zip"
+          TAG="v${V}"
+
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"   >> "$GITHUB_OUTPUT"
+
+      - name: Restore protoc cache
+        id: protoc-cache
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: ~/.protoc
+          key: protoc-${{ steps.protoc-arch.outputs.tag }}-${{ steps.protoc-arch.outputs.file }}-${{ runner.os }}
+
+      - name: Install protoc ${{ env.PROTOC_VERSION }}
+        if: steps.protoc-cache.outputs.cache-hit != 'true'
+        run: |
+          set -eux
+          mkdir -p "$HOME/.protoc"
+          FILE="${{ steps.protoc-arch.outputs.file }}"
+          TAG="${{ steps.protoc-arch.outputs.tag }}"
+          URL="https://github.com/protocolbuffers/protobuf/releases/download/${TAG}/${FILE}"
+          echo "Downloading $URL"
+          curl -sSfL -o "$FILE" "$URL"
+          unzip -o "$FILE" -d "$HOME/.protoc"
+          rm -f "$FILE"
+          echo "$HOME/.protoc/bin" >> "$GITHUB_PATH"
+          echo "PROTOC_INCLUDE=$HOME/.protoc/include" >> "$GITHUB_ENV"
+
+      - name: Add protoc to PATH and env (cache hit)
+        if: steps.protoc-cache.outputs.cache-hit == 'true'
+        run: |
+          echo "$HOME/.protoc/bin" >> "$GITHUB_PATH"
+          echo "PROTOC_INCLUDE=$HOME/.protoc/include" >> "$GITHUB_ENV"
+
+      - name: Verify protoc
+        run: |
+          set -eux
+          protoc --version
+          test -d "$PROTOC_INCLUDE"
+
+      - name: Setup go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Ensure go cache dirs and PATH
+        run: |
+          set -eux
+          mkdir -p "$GOBIN"
+          echo "$GOBIN" >> "$GITHUB_PATH"
+
+      - name: Cache go binaries
+        id: cache-go-bin
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
+        with:
+          path: ${{ env.GOBIN }}
+          key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ env.PROTOC_BIN_VERSION }}-${{ env.GRPC_BIN_VERSION }}
+
+      - name: Install go binaries
+        if: steps.cache-go-bin.outputs.cache-hit != 'true'
+        run: |
+          set -eux
+          go install "google.golang.org/protobuf/cmd/protoc-gen-go@${{ env.PROTOC_BIN_VERSION }}"
+          go install "google.golang.org/grpc/cmd/protoc-gen-go-grpc@${{ env.GRPC_BIN_VERSION }}"
+
+      - name: Verify go binaries
+        run: |
+          set -eux
+          protoc-gen-go --version
+          protoc-gen-go-grpc --version
