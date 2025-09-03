@@ -15,8 +15,6 @@ env:
 jobs:
   codegen:
     runs-on: ${{ matrix.os }}
-    env:
-      GNUPGHOME: ${{ runner.temp }}/gnupg-${{ github.run_id }}
     strategy:
       fail-fast: false
       matrix:
@@ -202,9 +200,10 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm run build
 
-      - name: Prepare GNUPG home
+      - name: Set GNUPGHOME
         run: |
           set -eux
+          echo "GNUPGHOME=$RUNNER_TEMP/gnupg-$GITHUB_RUN_ID" >> "$GITHUB_ENV"
           mkdir -p "$GNUPGHOME"
           chmod 700 "$GNUPGHOME"
 
