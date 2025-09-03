@@ -209,14 +209,14 @@ jobs:
         run: |
           set -eux
           git config user.name "cpay.dev GIT BOT"
-          git config user.email "203521523+cpay-dev-git@users.noreply.github.com"
+          git config user.email "github@cpay.dev"
           git checkout -B "$BRANCH"
           git add -A
           if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
           fi
-          git commit -m "sync: github.com/cpay-dev/proto-registry-pub/commit/$REV"
+          git commit -S -m "sync: github.com/cpay-dev/proto-registry-pub/commit/$REV"
           git push -u origin "$BRANCH"
 
       - name: Open PR
@@ -228,9 +228,10 @@ jobs:
         run: |
           set -eux
           gh pr list --state open --head "$BRANCH" --json number --jq '.[0].number' | grep -qE '^[0-9]+$' && exit 0
+          echo "Commit: $REV\nSource: github.com/cpay-dev/proto-registry-pub/commit/$REV" > body.txt
           gh pr create \
             --base "autobuild" \
             --head "$BRANCH" \
             --title "Sync: $(git rev-parse --short HEAD)" \
-            --body "Commit: $REV\nSource: github.com/cpay-dev/proto-registry-pub/commit/$REV"
+            --body-file body.txt
 
