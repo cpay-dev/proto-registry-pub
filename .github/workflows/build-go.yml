@@ -87,13 +87,6 @@ jobs:
           protoc --version
           test -d "$PROTOC_INCLUDE"
 
-      - name: Setup dummy go.mod
-        run: |
-          set -eux
-          echo "module github.com/cpay-dev/proto-registry-pub" >> go.mod
-          echo "" >> go.mod
-          echo "go 1.25.0" >> go.mod
-
       - name: Setup go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
         with:
