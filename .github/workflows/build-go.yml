@@ -136,3 +136,22 @@ jobs:
           --go_opt=paths=source_relative \
           --go-grpc_out=./build/go \
           --go-grpc_opt=paths=source_relative {} \;
+
+      - name: Checkout proto-go
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          token: ${{ secrets.PROTO_GO_PUB_WRITE_TOKEN }}
+          repository: 'cpay-dev/proto-go-pub'
+          path: 'proto-go-pub'
+
+      - name: Sync sources
+        run: |
+          set -eux
+          test -d build || { echo "build dir not found"; exit 1; }
+          find 'proto-go-pub' -mindepth 1 -maxdepth 1 \
+            ! -name 'go.mod' \
+            ! -name 'go.sum' \
+            ! -name '.*' \
+            -exec rm -rf {} +
+          cp -r ./build/* proto-go-pub/
+          ls -la proto-go-pub/
