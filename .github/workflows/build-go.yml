@@ -9,7 +9,6 @@ permissions:
   contents: read
 
 env:
-  GOBIN: "${{ github.workspace }}/.cache/go-tools/bin"
   PROTOC_VERSION: "32.0"
   PROTOC_BIN_VERSION: "v1.36.8"
   GRPC_BIN_VERSION: "v1.5.1"
@@ -94,10 +93,13 @@ jobs:
           cache-dependency-path: 'deps/go-proto/go.sum'
 
       - name: Ensure go cache dirs and PATH
+        env:
+          GOBIN: "${{ github.workspace }}/.cache/go-tools/bin"
         run: |
           set -eux
           mkdir -p "$GOBIN"
           echo "$GOBIN" >> "$GITHUB_PATH"
+          echo "$GOBIN" >> "$GITHUB_ENV"
 
       - name: Cache go binaries
         id: cache-go-bin
