@@ -11,7 +11,7 @@ permissions:
 env:
   PROTOC_VERSION: "32.0"
   PNPM_VERSION: "10.15.1"
-  GNUPGHOME: ${{ runner.temp }}/gnupg-${{ github.run_id }}
+  GNUPGHOME: "~/.gnupg"
 
 jobs:
   codegen:
