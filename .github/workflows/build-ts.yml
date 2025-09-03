@@ -26,7 +26,6 @@ jobs:
 
       - name: Compute protoc archive name
         id: protoc-arch
-        shell: bash
         run: |
           set -eu
           V="${PROTOC_VERSION}"
@@ -60,7 +59,6 @@ jobs:
 
       - name: Install protoc ${{ env.PROTOC_VERSION }}
         if: steps.protoc-cache.outputs.cache-hit != 'true'
-        shell: bash
         run: |
           set -eux
           mkdir -p "$HOME/.protoc"
@@ -76,13 +74,11 @@ jobs:
 
       - name: Add protoc to PATH and env (cache hit)
         if: steps.protoc-cache.outputs.cache-hit == 'true'
-        shell: bash
         run: |
           echo "$HOME/.protoc/bin" >> "$GITHUB_PATH"
           echo "PROTOC_INCLUDE=$HOME/.protoc/include" >> "$GITHUB_ENV"
 
       - name: Verify protoc
-        shell: bash
         run: |
           set -eux
           protoc --version
@@ -90,7 +86,6 @@ jobs:
 
       - name: Compute pnpm filename
         id: pnpm-arch
-        shell: bash
         run: |
           set -eu
           V="${PNPM_VERSION}"
@@ -124,7 +119,6 @@ jobs:
 
       - name: Install pnpm ${{ env.PNPM_VERSION }} from GitHub
         if: steps.pnpm-cache.outputs.cache-hit != 'true'
-        shell: bash
         run: |
           set -eux
           mkdir -p "$HOME/.pnpm-bin"
@@ -138,12 +132,10 @@ jobs:
 
       - name: Add pnpm to PATH (cache hit)
         if: steps.pnpm-cache.outputs.cache-hit == 'true'
-        shell: bash
         run: |
           echo "$HOME/.pnpm-bin" >> "$GITHUB_PATH"
 
       - name: Verify pnpm
-        shell: bash
         run: |
           set -eux
           pnpm --version
@@ -156,13 +148,11 @@ jobs:
           cache-dependency-path: 'deps/ts-proto/pnpm-lock.yaml'
 
       - name: Install deps with pnpm
-        shell: bash
         run: |
           set -eux
           pnpm install --dir deps/ts-proto --frozen-lockfile
 
       - name: Build sources
-        shell: bash
         run: |
           set -eux
           mkdir build
@@ -229,7 +219,7 @@ jobs:
             echo "No changes to commit"
             exit 0
           fi
-          git commit -S -m "sync: github.com/cpay-dev/proto-registry-pub/commit/$REV"
+          git commit -S -m "sync Typescript with ${{ github.ref_name }}"
           git push -u origin "$BRANCH"
 
       - name: Open PR
@@ -241,9 +231,8 @@ jobs:
           GH_TOKEN: ${{ secrets.PROTO_TS_PUB_WRITE_TOKEN }}
         run: |
           set -eux
-          gh pr list --state open --head "$BRANCH" --json number --jq '.[0].number' | grep -qE '^[0-9]+$' && exit 0
           gh pr create \
             --base "autobuild" \
             --head "$BRANCH" \
-            --title "Sync: $(git rev-parse --short HEAD)" \
+            --title "Sync Typescript with ${{ github.ref_name }}" \
             --body "[Source commit](https://github.com/cpay-dev/proto-registry-pub/commit/$REV)"
