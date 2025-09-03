@@ -227,8 +227,8 @@ jobs:
         run: |
           set -eux
           gh pr list --state open --head "$BRANCH" --json number --jq '.[0].number' | grep -qE '^[0-9]+$' && exit 0
-          echo "Commit: $REV\nSource: github.com/cpay-dev/proto-registry-pub/commit/$REV" > body.txt
-          cat body.txt
+          echo "Commit: $REV" >> body.txt
+          echo "Source: github.com/cpay-dev/proto-registry-pub/commit/$REV" >> body.txt
           gh pr create \
             --base "autobuild" \
             --head "$BRANCH" \
