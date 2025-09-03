@@ -11,8 +11,8 @@ permissions:
 env:
   GOBIN: "${{ github.workspace }}/.cache/go-tools/bin"
   PROTOC_VERSION: "32.0"
-  PROTOC_BIN_VERSION: "1.36.8"
-  GRPC_BIN_VERSION: "1.75.0"
+  PROTOC_BIN_VERSION: "v1.36.8"
+  GRPC_BIN_VERSION: "v1.75.0"
 
 jobs:
   codegen:
@@ -105,7 +105,7 @@ jobs:
           path: ${{ env.GOBIN }}
           key: ${{ runner.os }}-go-${{ env.GO_VERSION }}-${{ env.PROTOC_BIN_VERSION }}-${{ env.GRPC_BIN_VERSION }}
 
-      - name: Install go binaries
+      - name: Install go binaries (cache miss)
         if: steps.cache-go-bin.outputs.cache-hit != 'true'
         run: |
           set -eux
