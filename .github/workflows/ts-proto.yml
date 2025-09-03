@@ -11,6 +11,7 @@ permissions:
 env:
   PROTOC_VERSION: "32.0"
   PNPM_VERSION: "10.15.1"
+  GNUPGHOME: ${{ runner.temp }}/gnupg-${{ github.run_id }}
 
 jobs:
   codegen:
@@ -200,6 +201,21 @@ jobs:
           pnpm install --frozen-lockfile
           pnpm run build
 
+      - name: Prepare GNUPG home
+        run: |
+          set -eux
+          mkdir -p "$GNUPGHOME"
+          chmod 700 "$GNUPGHOME"
+
+      - name: Import GPG key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_SIGNING_KEY }}
+          run: |
+            echo "$GPG_PRIVATE_KEY" | gpg --batch --yes --import
+            KEYID=$(gpg --list-secret-keys --keyid-format=long | sed -n 's/^sec.*\/\([0-9A-F]\+\).*/\1/p' | head -n1)
+            echo "GPG_KEYID=$KEYID" >> "$GITHUB_ENV"
+            
+
       - name: Commit and push to ts-proto
         working-directory: 'proto-ts-pub'
         env:
@@ -210,13 +226,16 @@ jobs:
           set -eux
           git config user.name "cpay.dev GIT BOT"
           git config user.email "github@cpay.dev"
+          git config commit.gpgsign true
+          git config user.signingkey "$GPG_KEYID"
+          git config gpg.program gpg
           git checkout -B "$BRANCH"
           git add -A
           if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
           fi
-          git commit -m "sync: github.com/cpay-dev/proto-registry-pub/commit/$REV"
+          git commit -S -m "sync: github.com/cpay-dev/proto-registry-pub/commit/$REV"
           git push -u origin "$BRANCH"
 
       - name: Open PR
@@ -234,4 +253,3 @@ jobs:
             --head "$BRANCH" \
             --title "Sync: $(git rev-parse --short HEAD)" \
             --body-file body.txt
-
