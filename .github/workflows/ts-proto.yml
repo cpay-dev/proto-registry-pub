@@ -11,11 +11,12 @@ permissions:
 env:
   PROTOC_VERSION: "32.0"
   PNPM_VERSION: "10.15.1"
-  GNUPGHOME: "~/.gnupg"
 
 jobs:
   codegen:
     runs-on: ${{ matrix.os }}
+    env:
+      GNUPGHOME: ${{ runner.temp }}/gnupg-${{ github.run_id }}
     strategy:
       fail-fast: false
       matrix:
