@@ -210,10 +210,10 @@ jobs:
       - name: Import GPG key
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_SIGNING_KEY }}
-          run: |
-            echo "$GPG_PRIVATE_KEY" | gpg --batch --yes --import
-            KEYID=$(gpg --list-secret-keys --keyid-format=long | sed -n 's/^sec.*\/\([0-9A-F]\+\).*/\1/p' | head -n1)
-            echo "GPG_KEYID=$KEYID" >> "$GITHUB_ENV"
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --yes --import
+          KEYID=$(gpg --list-secret-keys --keyid-format=long | sed -n 's/^sec.*\/\([0-9A-F]\+\).*/\1/p' | head -n1)
+          echo "GPG_KEYID=$KEYID" >> "$GITHUB_ENV"
             
 
       - name: Commit and push to ts-proto
