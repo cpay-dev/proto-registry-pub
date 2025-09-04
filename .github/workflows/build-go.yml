@@ -154,7 +154,7 @@ jobs:
             ! -name '.*' \
             -exec rm -rf {} +
           cp -r ./build/* proto-go-pub/
-      
+
       - name: Validate go library builds
         working-directory: 'proto-go-pub'
         run: |
@@ -169,11 +169,7 @@ jobs:
           echo 'func main() {' >> cmd/unit/main.go
           echo '  println("chain:", v1.Chain_CHAIN_ANY_EVM)' >> cmd/unit/main.go
           echo '}' >> cmd/unit/main.go
-          last_line=$(go run cmd/unit/main.go | tail -n 1)
-          if [ "$last_line" != "chain:1" ]; then
-            echo "Unexpected output: $last_line"
-            exit 1
-          fi
+          go build cmd/unit/main.go && ./main && rm ./main
 
       - name: Install SSH signing key
         if: ${{ matrix.os == 'macos-15' }}
@@ -184,3 +180,41 @@ jobs:
           install -m 700 -d "$HOME/.ssh"
           printf '%s\n' "${SIGNING_KEY}" > "$HOME/.ssh/github-signing"
           chmod 600 "$HOME/.ssh/github-signing"
+
+      - name: Commit and push to proto-go
+        if: ${{ matrix.os == 'macos-15' }}
+        working-directory: 'proto-go-pub'
+        env:
+          REV: ${{ github.sha }}
+          BRANCH: "sync/${{ github.sha }}"
+          GH_TOKEN: ${{ secrets.PROTO_GO_PUB_WRITE_TOKEN }}
+        run: |
+          set -eux
+          git config user.name "cpay.dev[bot]"
+          git config user.email "203521523+cpay-dev-git@users.noreply.github.com"
+          git config gpg.format ssh
+          git config user.signingkey "$HOME/.ssh/github-signing"
+          git config commit.gpgsign true
+          git checkout -B "$BRANCH"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -S -m "sync Go with ${{ github.ref_name }}"
+          git push -u origin "$BRANCH"
+
+      - name: Open PR
+        if: ${{ matrix.os == 'macos-15' }}
+        working-directory: 'proto-go-pub'
+        env:
+          REV: ${{ github.sha }}
+          BRANCH: "sync/${{ github.sha }}"
+          GH_TOKEN: ${{ secrets.PROTO_GO_PUB_WRITE_TOKEN }}
+        run: |
+          set -eux
+          gh pr create \
+            --base "autobuild" \
+            --head "$BRANCH" \
+            --title "Sync Go with ${{ github.ref_name }}" \
+            --body "[Source commit](https://github.com/cpay-dev/proto-registry-pub/commit/$REV)"

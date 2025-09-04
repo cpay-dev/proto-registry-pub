@@ -199,7 +199,7 @@ jobs:
           printf '%s\n' "${SIGNING_KEY}" > "$HOME/.ssh/github-signing"
           chmod 600 "$HOME/.ssh/github-signing"
 
-      - name: Commit and push to ts-proto
+      - name: Commit and push to proto-ts
         if: ${{ matrix.os == 'macos-15' }}
         working-directory: 'proto-ts-pub'
         env:
