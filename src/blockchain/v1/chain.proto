@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package cpay.blockchain.v1;
 
-option go_package = "github.com/cpay-dev/proto-go/blockchain/v1";
+option go_package = "github.com/cpay-dev/proto-go-pub/blockchain/v1";
 
 enum Chain {
   CHAIN_UNSPECIFIED = 0;

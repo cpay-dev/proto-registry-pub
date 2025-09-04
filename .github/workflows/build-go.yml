@@ -153,6 +153,34 @@ jobs:
             ! -name 'go.sum' \
             ! -name '.*' \
             -exec rm -rf {} +
-          ls -la ./build
           cp -r ./build/* proto-go-pub/
-          ls -la proto-go-pub/
+      
+      - name: Validate go library builds
+        working-directory: 'proto-go-pub'
+        run: |
+          set -eux
+          go mod tidy
+          go mod verify
+          mkdir -p cmd/unit
+          echo 'package main' >> cmd/unit/main.go
+          echo '' >> cmd/unit/main.go
+          echo 'import "github.com/cpay-dev/proto-go/blockchain/v1"' >> cmd/unit/main.go
+          echo '' >> cmd/unit/main.go
+          echo 'func main() {' >> cmd/unit/main.go
+          echo '  println("chain:", v1.Chain_CHAIN_ANY_EVM)' >> cmd/unit/main.go
+          echo '}' >> cmd/unit/main.go
+          last_line=$(go run cmd/unit/main.go | tail -n 1)
+          if [ "$last_line" != "chain:1" ]; then
+            echo "Unexpected output: $last_line"
+            exit 1
+          fi
+
+      - name: Install SSH signing key
+        if: ${{ matrix.os == 'macos-15' }}
+        env:
+          SIGNING_KEY: ${{ secrets.SSH_SIGNING_KEY }}
+        run: |
+          set -eux
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "${SIGNING_KEY}" > "$HOME/.ssh/github-signing"
+          chmod 600 "$HOME/.ssh/github-signing"
