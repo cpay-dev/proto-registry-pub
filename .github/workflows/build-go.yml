@@ -164,7 +164,7 @@ jobs:
           mkdir -p cmd/unit
           echo 'package main' >> cmd/unit/main.go
           echo '' >> cmd/unit/main.go
-          echo 'import "github.com/cpay-dev/proto-go/blockchain/v1"' >> cmd/unit/main.go
+          echo 'import "github.com/cpay-dev/proto-go-pub/blockchain/v1"' >> cmd/unit/main.go
           echo '' >> cmd/unit/main.go
           echo 'func main() {' >> cmd/unit/main.go
           echo '  println("chain:", v1.Chain_CHAIN_ANY_EVM)' >> cmd/unit/main.go
